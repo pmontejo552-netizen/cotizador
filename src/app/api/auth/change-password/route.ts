@@ -21,9 +21,10 @@ export async function POST(req: Request) {
   const okPass = await verifyPassword(current, user.passwordHash);
   if (!okPass) return bad('La contraseña actual no es correcta.', 403);
 
+  // Al cambiarla, se limpia la marca de "contraseña temporal".
   await prisma.user.update({
     where: { id: me.id },
-    data: { passwordHash: await hashPassword(next) },
+    data: { passwordHash: await hashPassword(next), mustChangePassword: false },
   });
   return ok({ ok: true });
 }

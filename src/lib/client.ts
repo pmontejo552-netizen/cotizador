@@ -7,6 +7,7 @@ export interface Me {
   name: string;
   email: string;
   role: string;
+  mustChangePassword: boolean;
 }
 
 // fetch con manejo de errores en español. La identidad viaja en la cookie de
@@ -50,7 +51,17 @@ export function useMe(): { me: Me | null; loading: boolean } {
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     api<Me>('/api/auth/me')
-      .then(setMe)
+      .then((u) => {
+        setMe(u);
+        // Contraseña temporal: obligar el cambio antes de seguir.
+        if (
+          u.mustChangePassword &&
+          typeof window !== 'undefined' &&
+          window.location.pathname !== '/cambiar-password'
+        ) {
+          window.location.href = '/cambiar-password';
+        }
+      })
       .catch(() => setMe(null))
       .finally(() => setLoading(false));
   }, []);

@@ -59,10 +59,10 @@ export default function UsersAdmin() {
   }
 
   async function resetPassword(u: UserRow) {
-    const pw = prompt(`Nueva contraseña para ${u.name} (mínimo 8 caracteres):`);
+    const pw = prompt(`Contraseña temporal para ${u.name} (mínimo 8 caracteres):`);
     if (!pw) return;
     await patch(u.id, { password: pw });
-    alert('Contraseña actualizada.');
+    alert('Contraseña temporal asignada. La persona deberá cambiarla al entrar.');
   }
 
   return (
@@ -102,10 +102,14 @@ export default function UsersAdmin() {
             </select>
           </div>
           <div>
-            <label className="label">Contraseña inicial (mín. 8)</label>
+            <label className="label">Contraseña temporal (mín. 8)</label>
             <input className="inp" type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
           </div>
         </div>
+        <p className="text-xs text-slate-400">
+          Pasale esta contraseña temporal a la persona por fuera. Al entrar, el sistema la obliga a
+          cambiarla.
+        </p>
         <button className="btn-primary" onClick={create} disabled={busy}>
           {busy ? 'Creando…' : 'Crear usuario'}
         </button>

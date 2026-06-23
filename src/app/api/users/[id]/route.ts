@@ -42,7 +42,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if ('password' in body) {
     const pw = String(body.password || '');
     if (pw.length < 8) return bad('La contraseña debe tener al menos 8 caracteres.');
+    // Reinicio de contraseña = temporal: el usuario la cambia en su próximo ingreso.
     data.passwordHash = await hashPassword(pw);
+    data.mustChangePassword = true;
   }
 
   if (Object.keys(data).length === 0) return bad('Nada para actualizar.');

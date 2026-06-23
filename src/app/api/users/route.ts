@@ -39,8 +39,15 @@ export async function POST(req: Request) {
   const exists = await prisma.user.findUnique({ where: { email } });
   if (exists) return bad('Ya existe un usuario con ese correo.', 409);
 
+  // La contraseña es TEMPORAL: el usuario deberá cambiarla en su primer ingreso.
   const created = await prisma.user.create({
-    data: { name, email, role, passwordHash: await hashPassword(password) },
+    data: {
+      name,
+      email,
+      role,
+      passwordHash: await hashPassword(password),
+      mustChangePassword: true,
+    },
     select: { id: true, name: true, email: true, role: true, active: true, createdAt: true },
   });
   return ok(created, { status: 201 });

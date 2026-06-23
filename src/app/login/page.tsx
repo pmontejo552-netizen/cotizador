@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 function LoginForm() {
@@ -11,6 +11,16 @@ function LoginForm() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+
+  // Si el sistema está vacío, mandar a la configuración inicial.
+  useEffect(() => {
+    fetch('/api/auth/setup-status')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.needsSetup) router.replace('/setup');
+      })
+      .catch(() => {});
+  }, [router]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

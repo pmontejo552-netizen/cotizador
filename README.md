@@ -168,20 +168,36 @@ en `src/lib/storage.ts`.
 real, además de nombre y rol), la acción, la sección y la fecha. Ya no se usa un
 nombre escrito a mano.
 
-### Primer administrador
+### Crear el primer administrador
 
-Hay dos formas (elegí una):
+Hay dos formas; **ambas solo funcionan mientras no exista ningún usuario** (después
+quedan desactivadas para siempre):
 
-1. **Bootstrap por primer login (recomendado en Render):** configurá `ADMIN_EMAIL`
-   y `ADMIN_PASSWORD` como variables de entorno. Si todavía **no existe ningún
-   usuario**, el primer login con esas credenciales crea el admin automáticamente.
-   Entrá y, desde **Usuarios**, creá el resto de las cuentas. Cambiá tu contraseña
-   en cuanto puedas.
-2. **Seed por comando (local o con shell):** `ADMIN_EMAIL=... ADMIN_PASSWORD=... npm run seed:admin`.
+1. **Pantalla de configuración inicial (`/setup`):** con el sistema vacío, al abrir
+   la app te lleva a `/setup`, un formulario para crear el primer Admin (nombre,
+   correo, contraseña). Al guardarlo, quedás logueado como admin y la pantalla se
+   apaga: si alguien vuelve a `/setup`, lo manda al login normal.
+2. **Variables de entorno (bootstrap por primer login):** configurá `ADMIN_EMAIL` y
+   `ADMIN_PASSWORD`. El primer login con esas credenciales crea el admin
+   automáticamente (útil en Render, sin consola). También podés correr
+   `ADMIN_EMAIL=... ADMIN_PASSWORD=... npm run seed:admin` (local o con shell).
 
-Recuperación de contraseña: el admin la reinicia desde la pantalla **Usuarios**
-(botón "Reiniciar contraseña"); cada usuario también puede cambiar la suya. (Un
-flujo de auto-recuperación por correo requeriría conectar un proveedor de email.)
+### Crear los demás usuarios
+
+Entrá como admin → **Usuarios** (solo visible/accesible para Admin, verificado en el
+servidor):
+
+- **Crear usuario:** nombre, correo, rol (Admin, Gerente, Materiales, Precios,
+  Tiempos, Otros costos, Solo lectura) y una **contraseña temporal**. Esa contraseña
+  se la pasás a la persona por fuera (no se manda correo).
+- **Primer ingreso:** cuando esa persona entra con la contraseña temporal, el sistema
+  la **obliga a cambiarla** antes de seguir (mínimo 8 caracteres).
+- **Editar rol**, **desactivar/reactivar** (no se borran, para conservar el historial
+  atado a cada usuario) y **reiniciar contraseña** (genera otra temporal).
+
+Recuperación de contraseña: el admin la reinicia desde **Usuarios** (botón "Reiniciar
+contraseña"); el usuario la cambia al entrar. (Un flujo de auto-recuperación por
+correo requeriría conectar un proveedor de email.)
 
 ### Las cotizaciones anteriores siguen funcionando
 

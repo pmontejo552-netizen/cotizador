@@ -152,6 +152,7 @@ model User {
   role         String // admin | gerente | materiales | precios | tiempos | otros | lectura
   passwordHash String // hash bcrypt; nunca texto plano
   active       Boolean  @default(true)
+  mustChangePassword Boolean @default(false) // true cuando el admin asigna una contraseña temporal
   createdAt    DateTime @default(now())
   updatedAt    DateTime @default(now()) @updatedAt
 }

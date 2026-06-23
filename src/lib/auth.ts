@@ -38,6 +38,7 @@ export interface SessionUser {
   name: string;
   email: string;
   role: string;
+  mustChangePassword: boolean;
 }
 
 // Usuario autenticado actual (lee la cookie, verifica el JWT y carga el usuario de
@@ -49,7 +50,13 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   if (!payload) return null;
   const user = await prisma.user.findUnique({ where: { id: payload.uid } });
   if (!user || !user.active) return null;
-  return { id: user.id, name: user.name, email: user.email, role: user.role };
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    mustChangePassword: user.mustChangePassword,
+  };
 }
 
 // --- Rate limit de login (en memoria; suficiente en una instancia única) ---

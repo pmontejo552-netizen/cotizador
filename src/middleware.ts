@@ -5,7 +5,7 @@ import { SESSION_COOKIE, verifySession } from '@/lib/session';
 // Todo el sistema queda detrás del login. El middleware corre en cada request
 // (excepto estáticos) y exige una sesión válida. Esto es la primera barrera;
 // además cada endpoint vuelve a verificar el ROL del usuario (permisos finos).
-const PUBLIC_PREFIXES = ['/login', '/api/auth/'];
+const PUBLIC_PREFIXES = ['/login', '/setup', '/api/auth/'];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
