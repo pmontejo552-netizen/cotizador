@@ -9,6 +9,7 @@ import { progressPct } from '@/lib/calc';
 import { IdentityGate, ActorBar } from '@/components/IdentityGate';
 import { SectionShell } from '@/components/SectionShell';
 import { MaterialsSection } from '@/components/MaterialsSection';
+import { PricesSection } from '@/components/PricesSection';
 import { LaborSection } from '@/components/LaborSection';
 import { OtherSection } from '@/components/OtherSection';
 import { Consolidation } from '@/components/Consolidation';
@@ -155,6 +156,7 @@ export default function QuoteDetail() {
         </div>
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
           <Stage label="Materiales" done={quote.materialsClosed} />
+          <Stage label="Precios" done={quote.pricesClosed} />
           <Stage label="Mano de obra" done={quote.laborClosed} />
           <Stage label="Otros" done={quote.otherClosed} />
           <Stage label="Markup" done={quote.markupClosed} />
@@ -162,7 +164,7 @@ export default function QuoteDetail() {
         </div>
         {locked && (
           <p className="mt-3 rounded-lg bg-emerald-50 p-2 text-sm text-emerald-700">
-            🔒 Aprobada y bloqueada por {quote.approvedBy}. Desbloqueá desde la sección 5 para editar.
+            🔒 Aprobada y bloqueada por {quote.approvedBy}. Desbloqueá desde la sección 6 para editar.
           </p>
         )}
       </div>
@@ -183,9 +185,22 @@ export default function QuoteDetail() {
 
         <SectionShell
           quote={quote}
+          sectionKey="precios"
+          noteKey="precios"
+          number={2}
+          title="Precios"
+          closed={quote.pricesClosed}
+          lastBy={quote.pricesLastBy}
+          onChanged={reload}
+        >
+          <PricesSection quote={quote} items={materials} onChanged={reload} locked={locked} />
+        </SectionShell>
+
+        <SectionShell
+          quote={quote}
           sectionKey="mano_obra"
           noteKey="mano_obra"
-          number={2}
+          number={3}
           title="Mano de obra y tiempos"
           closed={quote.laborClosed}
           lastBy={quote.laborLastBy}
@@ -198,7 +213,7 @@ export default function QuoteDetail() {
           quote={quote}
           sectionKey="otros"
           noteKey="otros"
-          number={3}
+          number={4}
           title="Otros costos"
           closed={quote.otherClosed}
           lastBy={quote.otherLastBy}
@@ -210,7 +225,7 @@ export default function QuoteDetail() {
         <SectionShell
           quote={quote}
           noteKey="consolidacion"
-          number={4}
+          number={5}
           title="Consolidación (automática)"
           closable={false}
           onChanged={reload}
@@ -222,7 +237,7 @@ export default function QuoteDetail() {
           quote={quote}
           sectionKey="markup"
           noteKey="markup"
-          number={5}
+          number={6}
           title="Markup y precio final"
           closed={quote.markupClosed}
           lastBy={quote.markupLastBy}

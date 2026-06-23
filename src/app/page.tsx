@@ -22,6 +22,7 @@ interface QuoteRow {
   ivaPct: number;
   approved: boolean;
   materialsClosed: boolean;
+  pricesClosed: boolean;
   laborClosed: boolean;
   otherClosed: boolean;
   markupClosed: boolean;

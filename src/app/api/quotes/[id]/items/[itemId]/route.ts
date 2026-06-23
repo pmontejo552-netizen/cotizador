@@ -58,6 +58,13 @@ export async function PATCH(
 
   const updated = await prisma.lineItem.update({ where: { id: params.itemId }, data });
   await touchSection(params.id, existing.kind, actor);
+  // Edición de precio a mano: queda atribuida también a la sección Precios.
+  if (body._manualPrice && existing.kind === 'material') {
+    await prisma.quote.update({
+      where: { id: params.id },
+      data: { pricesLastBy: `${actor.name} (${actor.role})` },
+    });
+  }
   await logHistory({
     quoteId: params.id,
     userName: actor.name,

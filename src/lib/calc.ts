@@ -106,15 +106,23 @@ export function markupToMargin(markupPct: number): number {
   return round2((markupPct / (1 + markupPct / 100)) || 0);
 }
 
-/** % de avance de la cotización según secciones cerradas (5 secciones). */
+/** % de avance de la cotización según secciones cerradas. */
 export function progressPct(q: {
   materialsClosed: boolean;
+  pricesClosed?: boolean;
   laborClosed: boolean;
   otherClosed: boolean;
   markupClosed: boolean;
   approved: boolean;
 }): number {
-  const flags = [q.materialsClosed, q.laborClosed, q.otherClosed, q.markupClosed, q.approved];
+  const flags = [
+    q.materialsClosed,
+    Boolean(q.pricesClosed),
+    q.laborClosed,
+    q.otherClosed,
+    q.markupClosed,
+    q.approved,
+  ];
   const done = flags.filter(Boolean).length;
   return Math.round((done / flags.length) * 100);
 }

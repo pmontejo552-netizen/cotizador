@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 
 const NOTE_FIELD: Record<string, string> = {
   materiales: 'materialsNote',
+  precios: 'pricesNote',
   mano_obra: 'laborNote',
   otros: 'otherNote',
   consolidacion: 'consolidationNote',

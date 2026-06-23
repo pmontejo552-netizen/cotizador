@@ -21,6 +21,5 @@ uploads/
 
 # Artefactos temporales de verificación (se pueden borrar)
 _check/
-tsconfig.check.json
-tsconfig.server.json
+tsconfig.*.json
 *.tsbuildinfo

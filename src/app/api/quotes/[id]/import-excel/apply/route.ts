@@ -67,6 +67,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
   }
 
+  // Marca quién subió/actualizó los precios por última vez.
+  await prisma.quote.update({
+    where: { id: params.id },
+    data: { pricesLastBy: `${actor.name} (${actor.role})` },
+  });
+
   await logHistory({
     quoteId: params.id,
     userName: actor.name,

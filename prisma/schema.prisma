@@ -42,12 +42,14 @@ model Quote {
 
   // Cierre por sección
   materialsClosed Boolean @default(false)
+  pricesClosed    Boolean @default(false)
   laborClosed     Boolean @default(false)
   otherClosed     Boolean @default(false)
   markupClosed    Boolean @default(false)
 
   // Notas por sección
   materialsNote     String?
+  pricesNote        String?
   laborNote         String?
   otherNote         String?
   consolidationNote String?
@@ -55,6 +57,7 @@ model Quote {
 
   // Quién tocó cada sección por última vez
   materialsLastBy String?
+  pricesLastBy    String?
   laborLastBy     String?
   otherLastBy     String?
   markupLastBy    String?

@@ -58,15 +58,18 @@ export interface QuoteDTO {
   approvedBy: string | null;
   approvedAt: string | null;
   materialsClosed: boolean;
+  pricesClosed: boolean;
   laborClosed: boolean;
   otherClosed: boolean;
   markupClosed: boolean;
   materialsNote: string | null;
+  pricesNote: string | null;
   laborNote: string | null;
   otherNote: string | null;
   consolidationNote: string | null;
   markupNote: string | null;
   materialsLastBy: string | null;
+  pricesLastBy: string | null;
   laborLastBy: string | null;
   otherLastBy: string | null;
   markupLastBy: string | null;

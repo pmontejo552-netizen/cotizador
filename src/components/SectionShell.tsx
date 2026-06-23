@@ -31,6 +31,7 @@ export function SectionShell({
 }) {
   const noteValueMap: Record<string, string | null> = {
     materiales: quote.materialsNote,
+    precios: quote.pricesNote,
     mano_obra: quote.laborNote,
     otros: quote.otherNote,
     consolidacion: quote.consolidationNote,
