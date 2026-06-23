@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  background: #f1f5f9;
+  color: #0f172a;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Inputs táctiles cómodos en celular */
+input,
+select,
+textarea,
+button {
+  font-size: 16px; /* evita zoom en iOS */
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-1 rounded-lg px-3 py-2 text-sm font-medium transition active:scale-[0.98];
+  }
+  .btn-primary {
+    @apply btn bg-marca text-white hover:bg-marca-dark disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply btn bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50;
+  }
+  .btn-danger {
+    @apply btn bg-red-50 text-red-700 ring-1 ring-red-200 hover:bg-red-100;
+  }
+  .card {
+    @apply rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200;
+  }
+  .inp {
+    @apply w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-marca focus:ring-2 focus:ring-marca/20;
+  }
+  .label {
+    @apply text-xs font-medium text-slate-500;
+  }
+  .chip {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+}
+
+/* Estilos de impresión para la vista cliente / PDF */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+  .print-area {
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  @page {
+    margin: 16mm;
+  }
+}

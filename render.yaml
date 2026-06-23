@@ -1,0 +1,22 @@
+# Despliegue en Render (https://render.com) con disco persistente para
+# SQLite y archivos subidos. Conectá tu repo y Render lee este archivo.
+services:
+  - type: web
+    name: cotizador
+    runtime: node
+    plan: starter # incluye disco persistente
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: DATABASE_URL
+        value: file:/data/dev.db
+      - key: UPLOAD_DIR
+        value: /data/uploads
+      - key: ANTHROPIC_API_KEY
+        sync: false # configurala en el panel de Render (secreto)
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-4-6
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1

@@ -1,0 +1,26 @@
+node_modules
+.next
+out
+build
+*.log
+.DS_Store
+
+# Variables de entorno
+.env
+.env.local
+
+# Base de datos SQLite local
+prisma/dev.db
+prisma/dev.db-journal
+*.db
+*.db-journal
+
+# Archivos subidos en tiempo de ejecución
+uploads/
+!uploads/.gitkeep
+
+# Artefactos temporales de verificación (se pueden borrar)
+_check/
+tsconfig.check.json
+tsconfig.server.json
+*.tsbuildinfo

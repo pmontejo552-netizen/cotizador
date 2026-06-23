@@ -1,0 +1,152 @@
+// Esquema de base de datos del Cotizador.
+// Empieza en SQLite. Para migrar a Postgres: cambiá provider a "postgresql"
+// y la variable DATABASE_URL. El modelo de datos no cambia.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// --------------------------------------------------------------------------
+// Cotización: la entidad principal. Guarda encabezado, % configurables,
+// banderas de cierre por sección, notas por sección y estado de aprobación.
+// --------------------------------------------------------------------------
+model Quote {
+  id     String   @id @default(cuid())
+  number String // N.º de cotización
+  jobName String // Nombre del trabajo
+  client  String
+  date    DateTime @default(now())
+
+  companyName String @default("Mi Empresa")
+  currency    String @default("GTQ") // GTQ (Q) | USD ($)
+
+  // Porcentajes configurables por cotización
+  ivaPct            Float @default(12) // IVA %
+  wastePct          Float @default(5) // Desperdicio % sobre materiales
+  contingencyPct    Float @default(5) // Imprevistos % sobre el costo
+  markupPct         Float @default(30) // Markup % (lo edita el Gerente)
+  estimateSafetyPct Float @default(12) // Margen de seguridad para precios estimados
+
+  estimatedDays Float? // Tiempo estimado de obra (días)
+
+  // Estado general: borrador | en_proceso | aprobada
+  status     String  @default("borrador")
+  approved   Boolean @default(false)
+  approvedBy String?
+  approvedAt DateTime?
+
+  // Cierre por sección
+  materialsClosed Boolean @default(false)
+  laborClosed     Boolean @default(false)
+  otherClosed     Boolean @default(false)
+  markupClosed    Boolean @default(false)
+
+  // Notas por sección
+  materialsNote     String?
+  laborNote         String?
+  otherNote         String?
+  consolidationNote String?
+  markupNote        String?
+
+  // Quién tocó cada sección por última vez
+  materialsLastBy String?
+  laborLastBy     String?
+  otherLastBy     String?
+  markupLastBy    String?
+
+  includeAttachmentsInPdf Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items       LineItem[]
+  attachments Attachment[]
+  history     HistoryEntry[]
+}
+
+// --------------------------------------------------------------------------
+// Renglón (partida). Un único modelo para los 3 tipos, distinguidos por "kind":
+//   material -> usa description, itemType, unit, quantity, unitPrice
+//   labor    -> usa description, quantity, unitPrice (costo unitario)
+//   other    -> usa description (concepto) y amount (monto)
+// --------------------------------------------------------------------------
+model LineItem {
+  id      String @id @default(cuid())
+  quoteId String
+  quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  kind        String // material | labor | other
+  description String @default("")
+  itemType    String? // "tipo" (solo materiales)
+  unit        String?
+  quantity    Float   @default(0)
+  unitPrice   Float   @default(0)
+  amount      Float? // monto directo (solo "other")
+
+  // Precios estimados
+  isEstimated    Boolean @default(false)
+  noPrice        Boolean @default(false) // marcado como "sin precio"
+  estimateSource String? // history | claude | manual
+  estimateNote   String?
+
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([quoteId])
+}
+
+// --------------------------------------------------------------------------
+// Adjuntos: planos y fotos (PDF e imágenes). Comparte almacenamiento con Excel.
+// --------------------------------------------------------------------------
+model Attachment {
+  id      String @id @default(cuid())
+  quoteId String
+  quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  filename     String // nombre en disco
+  originalName String
+  mimeType     String
+  size         Int
+  uploadedBy   String?
+  createdAt    DateTime @default(now())
+
+  @@index([quoteId])
+}
+
+// --------------------------------------------------------------------------
+// Historial: quién cambió qué y cuándo.
+// --------------------------------------------------------------------------
+model HistoryEntry {
+  id      String @id @default(cuid())
+  quoteId String
+  quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  userName String
+  userRole String
+  section  String // materiales | precios | mano_obra | otros | consolidacion | markup | general
+  action   String // crear | editar | borrar | cerrar | reabrir | aprobar | importar | estimar
+  detail   String
+  createdAt DateTime @default(now())
+
+  @@index([quoteId])
+}
+
+// --------------------------------------------------------------------------
+// Usuarios y roles: NO se usan todavía (sin login). Se dejan listos para
+// agregar autenticación y permisos por rol más adelante sin rehacer el sistema.
+// --------------------------------------------------------------------------
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String?  @unique
+  role         String // materiales | precios | tiempos | otros | gerente
+  passwordHash String? // para auth futura
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+}
