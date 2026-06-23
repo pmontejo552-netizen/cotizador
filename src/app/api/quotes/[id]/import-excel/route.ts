@@ -1,6 +1,6 @@
 import { bad, ok } from '@/lib/api';
 import { hasClaudeKey } from '@/lib/anthropic';
-import { parseExcelWithClaude } from '@/lib/claude/excel';
+import { parseExcelWithClaude, parseOtrosExcelWithClaude } from '@/lib/claude/excel';
 import { MAX_FILE_BYTES, ALLOWED_EXCEL_TYPES } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
@@ -16,6 +16,7 @@ export async function POST(req: Request) {
 
   const form = await req.formData();
   const file = form.get('file');
+  const target = String(form.get('target') || 'materiales');
   if (!(file instanceof File)) return bad('No se recibió ningún archivo.');
   if (file.size > MAX_FILE_BYTES) return bad('El archivo supera el límite de 12 MB.');
 
@@ -25,8 +26,11 @@ export async function POST(req: Request) {
 
   try {
     const buf = Buffer.from(await file.arrayBuffer());
-    const items = await parseExcelWithClaude(buf);
-    return ok({ items, count: items.length });
+    const items =
+      target === 'otros'
+        ? await parseOtrosExcelWithClaude(buf)
+        : await parseExcelWithClaude(buf);
+    return ok({ items, count: items.length, target });
   } catch (e) {
     return bad(e instanceof Error ? e.message : 'No se pudo leer el Excel.', 500);
   }

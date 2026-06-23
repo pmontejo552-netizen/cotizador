@@ -3,29 +3,36 @@
 import { useState } from 'react';
 import { api, readActor } from '@/lib/client';
 
-interface Parsed {
+type Target = 'materiales' | 'otros';
+
+interface ParsedRow {
   description: string;
-  itemType: string | null;
-  unit: string | null;
-  quantity: number | null;
-  unitPrice: number | null;
+  itemType?: string | null;
+  unit?: string | null;
+  quantity?: number | null;
+  unitPrice?: number | null;
+  amount?: number | null;
 }
 
-// Sube el Excel, Claude detecta las columnas, el usuario REVISA la vista previa
-// y confirma. 'create' crea/actualiza renglones; 'prices' solo actualiza precios.
+// Modal genérico de importación de Excel leído por Claude.
+// target='materiales' -> crea/actualiza materiales (descripción, unidad, cantidad, precio).
+// target='otros'      -> crea conceptos de otros costos (concepto + monto).
 export function ExcelImportModal({
   quoteId,
+  target = 'materiales',
   onClose,
   onApplied,
 }: {
   quoteId: string;
+  target?: Target;
   onClose: () => void;
   onApplied: () => void;
 }) {
+  const isOtros = target === 'otros';
   const [step, setStep] = useState<'pick' | 'review'>('pick');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const [rows, setRows] = useState<Parsed[]>([]);
+  const [rows, setRows] = useState<ParsedRow[]>([]);
   const [mode, setMode] = useState<'create' | 'prices'>('create');
 
   async function upload(file: File) {
@@ -34,10 +41,11 @@ export function ExcelImportModal({
     try {
       const fd = new FormData();
       fd.append('file', file);
+      fd.append('target', target);
       const actor = readActor();
       fd.append('_actorName', actor.name);
       fd.append('_actorRole', actor.role);
-      const res = await api<{ items: Parsed[] }>(`/api/quotes/${quoteId}/import-excel`, {
+      const res = await api<{ items: ParsedRow[] }>(`/api/quotes/${quoteId}/import-excel`, {
         method: 'POST',
         body: fd,
       });
@@ -56,7 +64,7 @@ export function ExcelImportModal({
     try {
       await api(`/api/quotes/${quoteId}/import-excel/apply`, {
         method: 'POST',
-        body: { items: rows, mode },
+        body: { items: rows, mode, target },
       });
       onApplied();
     } catch (e) {
@@ -65,20 +73,22 @@ export function ExcelImportModal({
     }
   }
 
-  function edit(i: number, field: keyof Parsed, value: string) {
+  function edit(i: number, field: keyof ParsedRow, value: string) {
     setRows((r) => {
       const copy = [...r];
-      const num = field === 'quantity' || field === 'unitPrice';
+      const num = field === 'quantity' || field === 'unitPrice' || field === 'amount';
       (copy[i] as any)[field] = num ? (value === '' ? null : Number(value)) : value;
       return copy;
     });
   }
 
+  const titulo = isOtros ? 'Importar Excel de otros costos' : 'Importar Excel';
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
       <div className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-t-2xl bg-white sm:rounded-2xl">
         <div className="flex items-center justify-between border-b border-slate-100 p-4">
-          <h2 className="text-lg font-bold">Importar Excel de precios</h2>
+          <h2 className="text-lg font-bold">{titulo}</h2>
           <button className="text-slate-400" onClick={onClose}>
             ✕
           </button>
@@ -88,8 +98,9 @@ export function ExcelImportModal({
           {step === 'pick' && (
             <div className="space-y-3">
               <p className="text-sm text-slate-500">
-                Subí tu archivo .xlsx. Claude detecta las columnas (descripción, unidad, cantidad,
-                precio) aunque tengan otros nombres. Vas a revisar antes de aplicar.
+                {isOtros
+                  ? 'Subí tu Excel de otros costos. Claude detecta el concepto y el monto aunque las columnas tengan otros nombres. Vas a revisar antes de aplicar.'
+                  : 'Subí tu archivo .xlsx. Claude detecta las columnas (descripción, unidad, cantidad, precio) aunque tengan otros nombres. Vas a revisar antes de aplicar.'}
               </p>
               <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 p-8 text-center hover:border-marca">
                 <span className="text-sm font-medium text-marca">Elegir archivo Excel</span>
@@ -114,10 +125,19 @@ export function ExcelImportModal({
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-xs text-slate-400">
-                      <th className="p-1">Descripción</th>
-                      <th className="p-1">Unidad</th>
-                      <th className="p-1">Cant.</th>
-                      <th className="p-1">Precio</th>
+                      {isOtros ? (
+                        <>
+                          <th className="p-1">Concepto</th>
+                          <th className="p-1">Monto</th>
+                        </>
+                      ) : (
+                        <>
+                          <th className="p-1">Descripción</th>
+                          <th className="p-1">Unidad</th>
+                          <th className="p-1">Cant.</th>
+                          <th className="p-1">Precio</th>
+                        </>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -126,15 +146,23 @@ export function ExcelImportModal({
                         <td className="p-1">
                           <input className="inp" value={r.description} onChange={(e) => edit(i, 'description', e.target.value)} />
                         </td>
-                        <td className="p-1">
-                          <input className="inp w-16" value={r.unit ?? ''} onChange={(e) => edit(i, 'unit', e.target.value)} />
-                        </td>
-                        <td className="p-1">
-                          <input className="inp w-16 text-right" value={r.quantity ?? ''} onChange={(e) => edit(i, 'quantity', e.target.value)} />
-                        </td>
-                        <td className="p-1">
-                          <input className="inp w-20 text-right" value={r.unitPrice ?? ''} onChange={(e) => edit(i, 'unitPrice', e.target.value)} />
-                        </td>
+                        {isOtros ? (
+                          <td className="p-1">
+                            <input className="inp w-24 text-right" value={r.amount ?? ''} onChange={(e) => edit(i, 'amount', e.target.value)} />
+                          </td>
+                        ) : (
+                          <>
+                            <td className="p-1">
+                              <input className="inp w-16" value={r.unit ?? ''} onChange={(e) => edit(i, 'unit', e.target.value)} />
+                            </td>
+                            <td className="p-1">
+                              <input className="inp w-16 text-right" value={r.quantity ?? ''} onChange={(e) => edit(i, 'quantity', e.target.value)} />
+                            </td>
+                            <td className="p-1">
+                              <input className="inp w-20 text-right" value={r.unitPrice ?? ''} onChange={(e) => edit(i, 'unitPrice', e.target.value)} />
+                            </td>
+                          </>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -147,16 +175,18 @@ export function ExcelImportModal({
 
         {step === 'review' && (
           <div className="space-y-2 border-t border-slate-100 p-4">
-            <div className="flex gap-3 text-sm">
-              <label className="flex items-center gap-1">
-                <input type="radio" checked={mode === 'create'} onChange={() => setMode('create')} />
-                Crear / actualizar renglones
-              </label>
-              <label className="flex items-center gap-1">
-                <input type="radio" checked={mode === 'prices'} onChange={() => setMode('prices')} />
-                Solo actualizar precios
-              </label>
-            </div>
+            {!isOtros && (
+              <div className="flex gap-3 text-sm">
+                <label className="flex items-center gap-1">
+                  <input type="radio" checked={mode === 'create'} onChange={() => setMode('create')} />
+                  Crear / actualizar renglones
+                </label>
+                <label className="flex items-center gap-1">
+                  <input type="radio" checked={mode === 'prices'} onChange={() => setMode('prices')} />
+                  Solo actualizar precios
+                </label>
+              </div>
+            )}
             <div className="flex gap-2">
               <button className="btn-ghost flex-1" onClick={() => setStep('pick')} disabled={busy}>
                 ← Volver

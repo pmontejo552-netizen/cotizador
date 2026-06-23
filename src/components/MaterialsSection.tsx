@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import type { LineItemDTO, QuoteDTO } from '@/lib/types';
 import { api } from '@/lib/client';
 import { formatMoney, materialRowSubtotal } from '@/lib/calc';
 import { Cell } from './Editable';
+import { ExcelImportModal } from './ExcelImportModal';
 
 // Apartado de MATERIALES: "qué y cuánto" (descripción, tipo, unidad, cantidad).
 // El precio unitario se ve aquí (solo lectura) pero se carga en el apartado Precios.
@@ -19,6 +21,7 @@ export function MaterialsSection({
   locked: boolean;
 }) {
   const cur = quote.currency;
+  const [showImport, setShowImport] = useState(false);
 
   async function add() {
     await api(`/api/quotes/${quote.id}/items`, { method: 'POST', body: { kind: 'material' } });
@@ -35,12 +38,17 @@ export function MaterialsSection({
 
   return (
     <div className="space-y-3">
-      <button className="btn-ghost" onClick={add} disabled={locked}>
-        + Renglón
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button className="btn-ghost" onClick={add} disabled={locked}>
+          + Renglón
+        </button>
+        <button className="btn-ghost" onClick={() => setShowImport(true)} disabled={locked}>
+          ⤓ Importar Excel
+        </button>
+      </div>
       <p className="text-xs text-slate-400">
-        Acá va el material, su tipo, unidad y cantidad. El <b>precio</b> se carga en el apartado
-        “Precios”.
+        Acá va el material, su tipo, unidad y cantidad (a mano o subiendo un Excel que Claude lee).
+        El <b>precio</b> se carga en el apartado “Precios”.
       </p>
 
       {items.length === 0 && (
@@ -92,6 +100,18 @@ export function MaterialsSection({
           );
         })}
       </div>
+
+      {showImport && (
+        <ExcelImportModal
+          quoteId={quote.id}
+          target="materiales"
+          onClose={() => setShowImport(false)}
+          onApplied={() => {
+            setShowImport(false);
+            onChanged();
+          }}
+        />
+      )}
     </div>
   );
 }

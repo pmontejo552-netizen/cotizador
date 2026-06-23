@@ -13,10 +13,48 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const actor = actorFrom(body, req.headers);
   const incoming: any[] = Array.isArray(body.items) ? body.items : [];
   const mode = body.mode === 'prices' ? 'prices' : 'create';
+  const target = body.target === 'otros' ? 'otros' : 'materiales';
 
   const q = await prisma.quote.findUnique({ where: { id: params.id } });
   if (!q) return bad('Cotización no encontrada.', 404);
   if (q.approved) return bad('Cotización aprobada (bloqueada).', 409);
+
+  // --- Otros costos: crea renglones "other" (concepto + monto) ---
+  if (target === 'otros') {
+    const existingOther = await prisma.lineItem.findMany({
+      where: { quoteId: params.id, kind: 'other' },
+    });
+    let pos = existingOther.reduce((m, e) => Math.max(m, e.position), -1) + 1;
+    let createdOther = 0;
+    for (const row of incoming) {
+      const desc = String(row.description || '').trim();
+      if (!desc) continue;
+      await prisma.lineItem.create({
+        data: {
+          quoteId: params.id,
+          kind: 'other',
+          description: desc,
+          amount: numOr(row.amount, 0),
+          position: pos++,
+        },
+      });
+      createdOther++;
+    }
+    await prisma.quote.update({
+      where: { id: params.id },
+      data: { otherLastBy: `${actor.name} (${actor.role})` },
+    });
+    await logHistory({
+      quoteId: params.id,
+      userName: actor.name,
+      userRole: actor.role,
+      section: 'otros',
+      action: 'importar',
+      detail: `Importó Excel de otros costos: ${createdOther} conceptos.`,
+    });
+    await refreshStatus(params.id);
+    return ok({ created: createdOther, updated: 0 });
+  }
 
   const existing = await prisma.lineItem.findMany({
     where: { quoteId: params.id, kind: 'material' },

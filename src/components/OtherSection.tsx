@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import type { LineItemDTO, QuoteDTO } from '@/lib/types';
 import { api } from '@/lib/client';
 import { formatMoney } from '@/lib/calc';
 import { Cell } from './Editable';
+import { ExcelImportModal } from './ExcelImportModal';
 
 export function OtherSection({
   quote,
@@ -16,6 +18,8 @@ export function OtherSection({
   onChanged: () => void;
   locked: boolean;
 }) {
+  const [showImport, setShowImport] = useState(false);
+
   async function add() {
     await api(`/api/quotes/${quote.id}/items`, { method: 'POST', body: { kind: 'other' } });
     onChanged();
@@ -31,12 +35,18 @@ export function OtherSection({
 
   return (
     <div className="space-y-3">
-      <button className="btn-ghost" onClick={add} disabled={locked}>
-        + Concepto
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button className="btn-ghost" onClick={add} disabled={locked}>
+          + Concepto
+        </button>
+        <button className="btn-ghost" onClick={() => setShowImport(true)} disabled={locked}>
+          ⤓ Importar Excel
+        </button>
+      </div>
       {items.length === 0 && (
         <p className="py-3 text-center text-sm text-slate-400">
-          Sin otros costos (transporte, equipo, imprevistos puntuales…).
+          Sin otros costos (transporte, equipo, imprevistos puntuales…). Cargalos a mano o subí un
+          Excel que Claude lee.
         </p>
       )}
       <div className="space-y-2">
@@ -71,6 +81,18 @@ export function OtherSection({
             )}
           </span>
         </div>
+      )}
+
+      {showImport && (
+        <ExcelImportModal
+          quoteId={quote.id}
+          target="otros"
+          onClose={() => setShowImport(false)}
+          onApplied={() => {
+            setShowImport(false);
+            onChanged();
+          }}
+        />
       )}
     </div>
   );
