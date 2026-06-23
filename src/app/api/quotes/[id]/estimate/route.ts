@@ -1,5 +1,7 @@
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { ok, bad, actorFrom } from '@/lib/api';
+import { ok, bad, requireUser, forbidden } from '@/lib/api';
+import { canEditSection } from '@/lib/permissions';
 import { logHistory } from '@/lib/history';
 import { estimatePrice } from '@/lib/claude/estimate';
 
@@ -7,12 +9,15 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 // POST /api/quotes/:id/estimate  body: { itemId }
-// Propone un precio estimado para un material sin precio (historial primero,
-// luego Claude) + margen de seguridad. Lo aplica al renglón, marcado "estimado".
+// Estima el precio de un material. Es trabajo de la sección Precios.
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const body = await req.json().catch(() => ({}));
-  const actor = actorFrom(body, req.headers);
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
+  if (!canEditSection(user.role, 'precios')) {
+    return forbidden('Solo el rol Precios puede estimar precios.');
+  }
 
+  const body = await req.json().catch(() => ({}));
   const quote = await prisma.quote.findUnique({ where: { id: params.id } });
   if (!quote) return bad('Cotización no encontrada.', 404);
   if (quote.approved) return bad('Cotización aprobada (bloqueada).', 409);
@@ -42,8 +47,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     await logHistory({
       quoteId: params.id,
-      userName: actor.name,
-      userRole: actor.role,
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
       section: 'precios',
       action: 'estimar',
       detail: `Estimó "${item.description}" en Q ${est.unitPrice.toFixed(2)} (fuente: ${

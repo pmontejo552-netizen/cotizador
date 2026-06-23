@@ -1,13 +1,16 @@
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { ok, bad, actorFrom, refreshStatus, touchSection } from '@/lib/api';
+import { ok, bad, requireUser, forbidden, refreshStatus, touchSection } from '@/lib/api';
+import { canEditSection, sectionForKind, sectionForMaterialEdit, type Section } from '@/lib/permissions';
 import { logHistory } from '@/lib/history';
 
 export const dynamic = 'force-dynamic';
 
-const SECTION_BY_KIND: Record<string, string> = {
-  material: 'materiales',
-  labor: 'mano_obra',
-  other: 'otros',
+const SECTION_LABEL: Record<string, string> = {
+  materiales: 'materiales',
+  precios: 'precios',
+  mano_obra: 'mano_obra',
+  otros: 'otros',
 };
 
 const EDITABLE = [
@@ -28,8 +31,10 @@ export async function PATCH(
   req: Request,
   { params }: { params: { id: string; itemId: string } },
 ) {
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
+
   const body = await req.json().catch(() => ({}));
-  const actor = actorFrom(body, req.headers);
 
   const q = await prisma.quote.findUnique({ where: { id: params.id } });
   if (!q) return bad('Cotización no encontrada.', 404);
@@ -37,6 +42,14 @@ export async function PATCH(
 
   const existing = await prisma.lineItem.findUnique({ where: { id: params.itemId } });
   if (!existing || existing.quoteId !== params.id) return bad('Renglón no encontrado.', 404);
+
+  // Sección requerida: en materiales depende de si se toca el precio (rol Precios)
+  // o los datos descriptivos (rol Materiales).
+  const section: Section =
+    existing.kind === 'material' ? sectionForMaterialEdit(body) : sectionForKind(existing.kind);
+  if (!canEditSection(user.role, section)) {
+    return forbidden('Tu rol no puede editar este dato.');
+  }
 
   const data: Record<string, unknown> = {};
   for (const f of EDITABLE) {
@@ -49,7 +62,6 @@ export async function PATCH(
       }
     }
   }
-  // Si editan el precio a mano, deja de ser estimado/sin precio.
   if ('unitPrice' in body && body._manualPrice) {
     data.isEstimated = false;
     data.noPrice = false;
@@ -57,19 +69,19 @@ export async function PATCH(
   }
 
   const updated = await prisma.lineItem.update({ where: { id: params.itemId }, data });
-  await touchSection(params.id, existing.kind, actor);
-  // Edición de precio a mano: queda atribuida también a la sección Precios.
-  if (body._manualPrice && existing.kind === 'material') {
+  await touchSection(params.id, existing.kind, user);
+  if (section === 'precios' && existing.kind === 'material') {
     await prisma.quote.update({
       where: { id: params.id },
-      data: { pricesLastBy: `${actor.name} (${actor.role})` },
+      data: { pricesLastBy: `${user.name} (${user.role})` },
     });
   }
   await logHistory({
     quoteId: params.id,
-    userName: actor.name,
-    userRole: actor.role,
-    section: SECTION_BY_KIND[existing.kind] || 'general',
+    userId: user.id,
+    userName: user.name,
+    userRole: user.role,
+    section: SECTION_LABEL[section] || 'general',
     action: 'editar',
     detail: `Editó "${updated.description || existing.description || 'renglón'}".`,
   });
@@ -78,10 +90,12 @@ export async function PATCH(
 
 // DELETE /api/quotes/:id/items/:itemId
 export async function DELETE(
-  req: Request,
+  _req: Request,
   { params }: { params: { id: string; itemId: string } },
 ) {
-  const actor = actorFrom({}, req.headers);
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
+
   const q = await prisma.quote.findUnique({ where: { id: params.id } });
   if (!q) return bad('Cotización no encontrada.', 404);
   if (q.approved) return bad('Cotización aprobada (bloqueada).', 409);
@@ -89,12 +103,17 @@ export async function DELETE(
   const existing = await prisma.lineItem.findUnique({ where: { id: params.itemId } });
   if (!existing || existing.quoteId !== params.id) return bad('Renglón no encontrado.', 404);
 
+  if (!canEditSection(user.role, sectionForKind(existing.kind))) {
+    return forbidden('Tu rol no puede borrar renglones de esta sección.');
+  }
+
   await prisma.lineItem.delete({ where: { id: params.itemId } });
   await logHistory({
     quoteId: params.id,
-    userName: actor.name,
-    userRole: actor.role,
-    section: SECTION_BY_KIND[existing.kind] || 'general',
+    userId: user.id,
+    userName: user.name,
+    userRole: user.role,
+    section: sectionForKind(existing.kind),
     action: 'borrar',
     detail: `Borró "${existing.description || 'renglón'}".`,
   });

@@ -1,17 +1,20 @@
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { ok, bad, actorFrom, loadQuote, refreshStatus } from '@/lib/api';
+import { ok, bad, requireUser, forbidden, loadQuote } from '@/lib/api';
+import { canEditSection, canEditMarkup, isAdmin } from '@/lib/permissions';
 import { logHistory } from '@/lib/history';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/quotes/:id  -> cotización completa (polling la usa)
+// GET /api/quotes/:id  -> cotización completa (cualquier usuario autenticado).
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
   const quote = await loadQuote(params.id);
   if (!quote) return bad('Cotización no encontrada.', 404);
   return ok(quote);
 }
 
-// Campos del encabezado / configuración editables.
 const HEADER_FIELDS = [
   'number',
   'jobName',
@@ -26,15 +29,27 @@ const HEADER_FIELDS = [
   'includeAttachmentsInPdf',
 ];
 
-// PATCH /api/quotes/:id -> edita encabezado / % configurables / markup (gerente)
+// PATCH /api/quotes/:id -> edita encabezado/consolidación (gerente) o markup (gerente).
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const body = await req.json().catch(() => ({}));
-  const actor = actorFrom(body, req.headers);
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
 
+  const body = await req.json().catch(() => ({}));
   const quote = await prisma.quote.findUnique({ where: { id: params.id } });
   if (!quote) return bad('Cotización no encontrada.', 404);
   if (quote.approved && body._force !== true) {
     return bad('La cotización está aprobada (bloqueada). Desbloqueala para editar.', 409);
+  }
+
+  const wantsMarkup = 'markupPct' in body || 'targetMarginPct' in body;
+  const wantsHeader = HEADER_FIELDS.some((f) => f in body);
+
+  // Permisos por servidor:
+  if (wantsMarkup && !canEditMarkup(user.role)) {
+    return forbidden('Solo el Gerente puede editar el markup/margen.');
+  }
+  if (wantsHeader && !canEditSection(user.role, 'general')) {
+    return forbidden('Tu rol no puede editar el encabezado/configuración.');
   }
 
   const data: Record<string, unknown> = {};
@@ -42,20 +57,15 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (f in body) data[f] = body[f];
   }
 
-  // markup y margen: SOLO el gerente. El sistema convierte entre los dos.
   let markupChanged = false;
-  if ('markupPct' in body || 'targetMarginPct' in body) {
-    if (actor.role !== 'gerente') {
-      return bad('Solo el rol Gerente puede editar el markup/margen.', 403);
-    }
+  if (wantsMarkup) {
     if ('targetMarginPct' in body) {
       const m = parseFloat(String(body.targetMarginPct));
-      // markup = margen / (1 - margen/100)
       data.markupPct = m >= 100 ? quote.markupPct : (m / (1 - m / 100)) || 0;
     } else {
       data.markupPct = parseFloat(String(body.markupPct)) || 0;
     }
-    data.markupLastBy = `${actor.name} (${actor.role})`;
+    data.markupLastBy = `${user.name} (${user.role})`;
     markupChanged = true;
   }
 
@@ -63,8 +73,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   await logHistory({
     quoteId: params.id,
-    userName: actor.name,
-    userRole: actor.role,
+    userId: user.id,
+    userName: user.name,
+    userRole: user.role,
     section: markupChanged ? 'markup' : 'general',
     action: 'editar',
     detail: markupChanged
@@ -75,8 +86,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   return ok(updated);
 }
 
-// DELETE /api/quotes/:id
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+// DELETE /api/quotes/:id -> solo Admin o Gerente.
+export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
+  if (!(isAdmin(user.role) || user.role === 'gerente')) {
+    return forbidden('Solo Admin o Gerente pueden borrar cotizaciones.');
+  }
   const quote = await prisma.quote.findUnique({ where: { id: params.id } });
   if (!quote) return bad('Cotización no encontrada.', 404);
   await prisma.quote.delete({ where: { id: params.id } });

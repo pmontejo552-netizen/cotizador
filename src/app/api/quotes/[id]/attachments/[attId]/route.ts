@@ -1,15 +1,20 @@
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { bad, ok, actorFrom } from '@/lib/api';
+import { bad, ok, requireUser, forbidden } from '@/lib/api';
+import { canUploadAttachment } from '@/lib/permissions';
 import { logHistory } from '@/lib/history';
 import { readFile, deleteFile } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/quotes/:id/attachments/:attId -> descarga / vista previa
+// GET /api/quotes/:id/attachments/:attId -> descarga / vista previa (autenticado).
 export async function GET(
   req: Request,
   { params }: { params: { id: string; attId: string } },
 ) {
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
+
   const att = await prisma.attachment.findUnique({ where: { id: params.attId } });
   if (!att || att.quoteId !== params.id) return bad('Adjunto no encontrado.', 404);
 
@@ -31,12 +36,15 @@ export async function GET(
   }
 }
 
-// DELETE /api/quotes/:id/attachments/:attId
+// DELETE /api/quotes/:id/attachments/:attId -> roles con permiso de subir.
 export async function DELETE(
-  req: Request,
+  _req: Request,
   { params }: { params: { id: string; attId: string } },
 ) {
-  const actor = actorFrom({}, req.headers);
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
+  if (!canUploadAttachment(user.role)) return forbidden('Tu rol no puede borrar adjuntos.');
+
   const att = await prisma.attachment.findUnique({ where: { id: params.attId } });
   if (!att || att.quoteId !== params.id) return bad('Adjunto no encontrado.', 404);
 
@@ -45,8 +53,9 @@ export async function DELETE(
 
   await logHistory({
     quoteId: params.id,
-    userName: actor.name,
-    userRole: actor.role,
+    userId: user.id,
+    userName: user.name,
+    userRole: user.role,
     section: 'general',
     action: 'borrar',
     detail: `Borró adjunto "${att.originalName}".`,

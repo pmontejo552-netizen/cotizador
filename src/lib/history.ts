@@ -2,6 +2,7 @@ import { prisma } from './db';
 
 interface LogArgs {
   quoteId: string;
+  userId?: string | null;
   userName?: string | null;
   userRole?: string | null;
   section: string;
@@ -9,13 +10,14 @@ interface LogArgs {
   detail: string;
 }
 
-// Registra una entrada en el historial. Tolera actor faltante.
+// Registra una entrada en el historial, atada al usuario AUTENTICADO (id real).
 export async function logHistory(a: LogArgs) {
   try {
     await prisma.historyEntry.create({
       data: {
         quoteId: a.quoteId,
-        userName: a.userName?.trim() || 'Desconocido',
+        userId: a.userId ?? null,
+        userName: a.userName?.trim() || 'Sistema',
         userRole: a.userRole?.trim() || 'general',
         section: a.section,
         action: a.action,

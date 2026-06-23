@@ -1,11 +1,16 @@
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { ok, bad, actorFrom } from '@/lib/api';
+import { ok, bad, requireUser, forbidden } from '@/lib/api';
+import { canCreateQuote } from '@/lib/permissions';
 import { logHistory } from '@/lib/history';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/quotes  -> lista para el tablero (con avance y precio final calculado)
+// GET /api/quotes  -> lista para el tablero. Cualquier usuario autenticado la ve.
 export async function GET() {
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
+
   const quotes = await prisma.quote.findMany({
     orderBy: { updatedAt: 'desc' },
     include: { items: true },
@@ -13,16 +18,17 @@ export async function GET() {
   return ok(quotes);
 }
 
-// POST /api/quotes -> crea una cotización nueva
+// POST /api/quotes -> crea una cotización (cualquier rol salvo "solo lectura").
 export async function POST(req: Request) {
-  const body = await req.json().catch(() => ({}));
-  const actor = actorFrom(body, req.headers);
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
+  if (!canCreateQuote(user.role)) return forbidden('Tu rol no puede crear cotizaciones.');
 
+  const body = await req.json().catch(() => ({}));
   if (!body.jobName || !body.client) {
     return bad('Faltan datos: nombre del trabajo y cliente son obligatorios.');
   }
 
-  // Genera N.º consecutivo simple: COT-AÑO-#### según conteo existente.
   const year = new Date().getFullYear();
   const count = await prisma.quote.count();
   const number = body.number || `COT-${year}-${String(count + 1).padStart(4, '0')}`;
@@ -44,8 +50,9 @@ export async function POST(req: Request) {
 
   await logHistory({
     quoteId: quote.id,
-    userName: actor.name,
-    userRole: actor.role,
+    userId: user.id,
+    userName: user.name,
+    userRole: user.role,
     section: 'general',
     action: 'crear',
     detail: `Creó la cotización ${quote.number} (${quote.jobName}).`,

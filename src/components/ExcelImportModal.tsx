@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { api, readActor } from '@/lib/client';
+import { api } from '@/lib/client';
 
 type Target = 'materiales' | 'otros';
 
@@ -42,9 +42,6 @@ export function ExcelImportModal({
       const fd = new FormData();
       fd.append('file', file);
       fd.append('target', target);
-      const actor = readActor();
-      fd.append('_actorName', actor.name);
-      fd.append('_actorRole', actor.role);
       const res = await api<{ items: ParsedRow[] }>(`/api/quotes/${quoteId}/import-excel`, {
         method: 'POST',
         body: fd,

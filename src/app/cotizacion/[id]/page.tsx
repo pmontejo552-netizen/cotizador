@@ -4,9 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import type { QuoteDTO } from '@/lib/types';
-import { api, useActor } from '@/lib/client';
+import { api, useMe, logout } from '@/lib/client';
 import { progressPct } from '@/lib/calc';
-import { IdentityGate, ActorBar } from '@/components/IdentityGate';
+import { roleLabel } from '@/lib/roles';
 import { SectionShell } from '@/components/SectionShell';
 import { MaterialsSection } from '@/components/MaterialsSection';
 import { PricesSection } from '@/components/PricesSection';
@@ -26,8 +26,7 @@ export default function QuoteDetail() {
   const [quote, setQuote] = useState<QuoteDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
-  const [actor, setActor] = useActor();
-  const [forceIdentity, setForceIdentity] = useState(false);
+  const { me } = useMe();
   const [refreshKey, setRefreshKey] = useState(0);
   const editing = useRef(0); // # de inputs enfocados; pausa el polling al editar
 
@@ -87,22 +86,16 @@ export default function QuoteDetail() {
           editing.current = Math.max(0, editing.current - 1);
       }}
     >
-      {(!actor || forceIdentity) && (
-        <IdentityGate
-          actor={forceIdentity ? null : actor}
-          onSet={(a) => {
-            setActor(a);
-            setForceIdentity(false);
-          }}
-        />
-      )}
-
       {/* Barra superior */}
       <div className="mb-3 flex items-center justify-between gap-2">
         <Link href="/" className="text-sm text-marca hover:underline">
           ← Tablero
         </Link>
-        {actor && <ActorBar actor={actor} onChange={() => setForceIdentity(true)} />}
+        {me && (
+          <span className="chip bg-slate-100 text-slate-600">
+            {me.name} · {roleLabel(me.role)}
+          </span>
+        )}
       </div>
 
       {/* Encabezado */}
@@ -243,7 +236,7 @@ export default function QuoteDetail() {
           lastBy={quote.markupLastBy}
           onChanged={reload}
         >
-          {actor && <MarkupSection quote={quote} actor={actor} onChanged={reload} />}
+          {me && <MarkupSection quote={quote} role={me.role} onChanged={reload} />}
         </SectionShell>
 
         <ReviewPanel quoteId={quote.id} />

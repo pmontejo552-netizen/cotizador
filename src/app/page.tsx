@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/client';
+import { api, useMe, logout } from '@/lib/client';
 import { computeQuote, progressPct, formatMoney } from '@/lib/calc';
+import { roleLabel } from '@/lib/roles';
 import { StatusBadge, ProgressBar } from '@/components/StatusBadge';
 
 interface QuoteRow {
@@ -36,6 +37,7 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState('todos');
   const [clientFilter, setClientFilter] = useState('todos');
   const [showNew, setShowNew] = useState(false);
+  const { me } = useMe();
 
   async function load() {
     try {
@@ -70,6 +72,25 @@ export default function Dashboard() {
 
   return (
     <main className="mx-auto max-w-4xl px-3 pb-24 pt-4 sm:px-4">
+      {/* Barra de usuario */}
+      <div className="mb-3 flex items-center justify-end gap-2 text-sm">
+        {me && (
+          <>
+            <span className="chip bg-slate-100 text-slate-600">
+              {me.name} · {roleLabel(me.role)}
+            </span>
+            {me.role === 'admin' && (
+              <Link href="/admin/usuarios" className="text-marca hover:underline">
+                Usuarios
+              </Link>
+            )}
+            <button className="text-slate-500 hover:underline" onClick={() => logout()}>
+              Cerrar sesión
+            </button>
+          </>
+        )}
+      </div>
+
       <header className="mb-4 flex items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-bold sm:text-2xl">Cotizaciones</h1>

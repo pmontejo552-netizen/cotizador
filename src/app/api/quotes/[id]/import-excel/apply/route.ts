@@ -1,19 +1,25 @@
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { ok, bad, actorFrom, refreshStatus } from '@/lib/api';
+import { ok, bad, requireUser, forbidden, refreshStatus } from '@/lib/api';
+import { canUploadExcel } from '@/lib/permissions';
 import { logHistory } from '@/lib/history';
 
 export const dynamic = 'force-dynamic';
 
 // POST /api/quotes/:id/import-excel/apply
-// body: { items: [{description,itemType,unit,quantity,unitPrice}], mode: 'create'|'prices' }
-// 'create' -> crea renglones nuevos (o actualiza precio si ya existe por descripción)
-// 'prices' -> solo actualiza precios de materiales existentes que coincidan
+// body: { items, mode: 'create'|'prices', target: 'materiales'|'otros' }
 export async function POST(req: Request, { params }: { params: { id: string } }) {
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
+
   const body = await req.json().catch(() => ({}));
-  const actor = actorFrom(body, req.headers);
   const incoming: any[] = Array.isArray(body.items) ? body.items : [];
   const mode = body.mode === 'prices' ? 'prices' : 'create';
   const target = body.target === 'otros' ? 'otros' : 'materiales';
+
+  if (!canUploadExcel(user.role, target)) {
+    return forbidden('Tu rol no puede aplicar este Excel.');
+  }
 
   const q = await prisma.quote.findUnique({ where: { id: params.id } });
   if (!q) return bad('Cotización no encontrada.', 404);
@@ -42,12 +48,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
     await prisma.quote.update({
       where: { id: params.id },
-      data: { otherLastBy: `${actor.name} (${actor.role})` },
+      data: { otherLastBy: `${user.name} (${user.role})` },
     });
     await logHistory({
       quoteId: params.id,
-      userName: actor.name,
-      userRole: actor.role,
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
       section: 'otros',
       action: 'importar',
       detail: `Importó Excel de otros costos: ${createdOther} conceptos.`,
@@ -108,13 +115,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   // Marca quién subió/actualizó los precios por última vez.
   await prisma.quote.update({
     where: { id: params.id },
-    data: { pricesLastBy: `${actor.name} (${actor.role})` },
+    data: { pricesLastBy: `${user.name} (${user.role})` },
   });
 
   await logHistory({
     quoteId: params.id,
-    userName: actor.name,
-    userRole: actor.role,
+    userId: user.id,
+    userName: user.name,
+    userRole: user.role,
     section: mode === 'prices' ? 'precios' : 'materiales',
     action: 'importar',
     detail: `Importó Excel: ${created} renglones nuevos, ${updated} actualizados.`,

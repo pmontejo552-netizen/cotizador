@@ -1,13 +1,16 @@
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { ok, bad, actorFrom } from '@/lib/api';
+import { ok, bad, requireUser, forbidden } from '@/lib/api';
+import { canCreateQuote } from '@/lib/permissions';
 import { logHistory } from '@/lib/history';
 
 export const dynamic = 'force-dynamic';
 
 // POST /api/quotes/:id/duplicate -> nueva versión (copia sin perder la original)
-export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const body = await req.json().catch(() => ({}));
-  const actor = actorFrom(body, req.headers);
+export async function POST(_req: Request, { params }: { params: { id: string } }) {
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
+  if (!canCreateQuote(user.role)) return forbidden('Tu rol no puede duplicar cotizaciones.');
 
   const src = await prisma.quote.findUnique({
     where: { id: params.id },
@@ -59,8 +62,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   await logHistory({
     quoteId: copy.id,
-    userName: actor.name,
-    userRole: actor.role,
+    userId: user.id,
+    userName: user.name,
+    userRole: user.role,
     section: 'general',
     action: 'crear',
     detail: `Nueva versión duplicada de ${src.number}.`,

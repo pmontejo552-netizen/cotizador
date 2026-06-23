@@ -1,22 +1,23 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Actor, QuoteDTO } from '@/lib/types';
+import type { QuoteDTO } from '@/lib/types';
 import { api } from '@/lib/client';
 import { computeFromQuote, formatMoney, markupToMargin } from '@/lib/calc';
 
 // Sección del Gerente: markup o margen objetivo (el sistema convierte entre los
 // dos), muestra ganancia, precio sin IVA, IVA y precio final, y aprueba/bloquea.
+// El permiso real se valida en el servidor; acá solo se habilita/deshabilita la UI.
 export function MarkupSection({
   quote,
-  actor,
+  role,
   onChanged,
 }: {
   quote: QuoteDTO;
-  actor: Actor;
+  role: string;
   onChanged: () => void;
 }) {
-  const isManager = actor.role === 'gerente';
+  const isManager = role === 'gerente' || role === 'admin';
   const locked = quote.approved;
   const c = computeFromQuote(quote);
   const cur = quote.currency;
@@ -73,7 +74,7 @@ export function MarkupSection({
       {!isManager && (
         <p className="rounded-lg bg-slate-50 p-2 text-xs text-slate-500">
           El markup y el margen los edita el rol <b>Gerente</b>. Estás como{' '}
-          <b>{actor.role}</b>; podés ver los números pero no cambiarlos.
+          <b>{role}</b>; podés ver los números pero no cambiarlos.
         </p>
       )}
 

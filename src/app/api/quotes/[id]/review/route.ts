@@ -1,4 +1,5 @@
-import { bad, ok } from '@/lib/api';
+import { NextResponse } from 'next/server';
+import { bad, ok, requireUser } from '@/lib/api';
 import { reviewQuote } from '@/lib/claude/review';
 
 export const dynamic = 'force-dynamic';
@@ -7,6 +8,8 @@ export const maxDuration = 60;
 // POST /api/quotes/:id/review -> lista priorizada de cosas a revisar
 // (reglas fijas + análisis de Claude). Informativo, no bloquea.
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
   try {
     const result = await reviewQuote(params.id);
     return ok(result);

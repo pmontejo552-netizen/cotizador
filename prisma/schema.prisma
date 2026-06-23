@@ -130,7 +130,8 @@ model HistoryEntry {
   quoteId String
   quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
 
-  userName String
+  userId   String? // usuario autenticado real (FK a User). Null = entradas viejas/sistema.
+  userName String // nombre mostrado (copia para histórico, aunque el usuario cambie)
   userRole String
   section  String // materiales | precios | mano_obra | otros | consolidacion | markup | general
   action   String // crear | editar | borrar | cerrar | reabrir | aprobar | importar | estimar
@@ -147,9 +148,10 @@ model HistoryEntry {
 model User {
   id           String   @id @default(cuid())
   name         String
-  email        String?  @unique
-  role         String // materiales | precios | tiempos | otros | gerente
-  passwordHash String? // para auth futura
+  email        String   @unique // identificador de login
+  role         String // admin | gerente | materiales | precios | tiempos | otros | lectura
+  passwordHash String // hash bcrypt; nunca texto plano
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
 }

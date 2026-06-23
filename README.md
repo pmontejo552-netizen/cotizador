@@ -87,6 +87,10 @@ npm run test:calc
 | Variable            | Obligatoria | Descripción                                                                 |
 | ------------------- | ----------- | --------------------------------------------------------------------------- |
 | `DATABASE_URL`      | Sí          | SQLite: `file:./dev.db`. Postgres: `postgresql://...`.                       |
+| `SESSION_SECRET`    | Sí (prod)   | Clave para firmar las sesiones (JWT). Cadena larga y aleatoria (`openssl rand -base64 48`). |
+| `ADMIN_EMAIL`       | Sí (1ª vez) | Correo del primer administrador (bootstrap). Ver "Primer administrador".     |
+| `ADMIN_PASSWORD`    | Sí (1ª vez) | Contraseña del primer administrador (bootstrap). Cambiala al entrar.         |
+| `ADMIN_NAME`        | No          | Nombre del primer admin. Por defecto "Administrador".                        |
 | `ANTHROPIC_API_KEY` | Sí (para IA)| Key de Anthropic. **Solo se usa en el servidor**, nunca en el navegador.    |
 | `ANTHROPIC_MODEL`   | No          | Modelo de Claude. Por defecto `claude-sonnet-4-6`. Confirmá el string vigente en https://docs.claude.com |
 | `UPLOAD_DIR`        | No          | Carpeta de archivos subidos. Por defecto `./uploads`. En la nube, usá un disco persistente. |
@@ -125,17 +129,66 @@ El almacenamiento de archivos en disco también podría moverse a S3/R2 a futuro
 
 ---
 
-## Acceso (ahora vs. después)
+## Acceso, roles y permisos (nivel 2)
 
-**Ahora:** sin login. Al abrir una cotización, la persona escribe su nombre y
-elige su rol; eso se recuerda en el navegador y atribuye sus cambios en el
-historial. Cualquiera con el link puede ver y editar. La sección de markup está
-marcada como del **Gerente** (la app valida el rol elegido).
+Todo el sistema está **detrás de login**: sin iniciar sesión no se ve ninguna
+cotización ni dato (lo fuerza el `middleware.ts`, y además cada endpoint vuelve a
+verificar el rol). Las cuentas las crea un **administrador** (sistema por
+invitación, sin registro abierto).
 
-**Diseñado para después (no construido):** autenticación real, permisos por rol
-estrictos, administración de usuarios, notificaciones y websockets. La base de
-datos ya incluye una tabla `User` con roles y los campos necesarios para
-agregar todo eso sin rehacer el sistema.
+**Autenticación:** correo + contraseña. Las contraseñas se guardan **hasheadas con
+bcrypt** (nunca en texto plano). La sesión es un **JWT firmado en cookie httpOnly**
+con expiración (8 h) y botón de cerrar sesión. El login tiene **rate limit**
+(máx. 10 intentos / 15 min por IP+correo).
+
+**Roles:** `admin`, `gerente`, `materiales`, `precios`, `tiempos`, `otros`,
+`lectura` (solo lectura). Permisos (validados **en el servidor**, en cada endpoint):
+
+| Acción                                   | Quién |
+| ---------------------------------------- | ----- |
+| Ver cotizaciones                         | Cualquier usuario autenticado |
+| Editar sección Materiales                | `materiales` (y `admin`) |
+| Editar precios / estimar / subir Excel de precios | `precios` (y `admin`) |
+| Editar Mano de obra y tiempos            | `tiempos` (y `admin`) |
+| Editar Otros costos / subir su Excel     | `otros` (y `admin`) |
+| Editar encabezado y % de consolidación   | `gerente` (y `admin`) |
+| Editar markup/margen y **aprobar**       | `gerente` (y `admin`) |
+| Subir adjuntos (planos/fotos)            | Cualquier rol salvo `lectura` |
+| Crear/duplicar cotizaciones              | Cualquier rol salvo `lectura` |
+| Borrar cotización                        | `admin` o `gerente` |
+| Administrar usuarios                     | `admin` |
+
+Las verificaciones de permiso están en `src/lib/permissions.ts` y se aplican en
+cada ruta de `src/app/api/**`. Esconder botones en el frontend es solo cosmético;
+la barrera real está en el servidor. **Validación de archivos:** Excel solo
+`.xlsx/.xls`; adjuntos solo PDF e imágenes; límite de 12 MB; los nombres se sanean
+en `src/lib/storage.ts`.
+
+**Historial:** cada cambio queda atado al **usuario autenticado** (su `userId`
+real, además de nombre y rol), la acción, la sección y la fecha. Ya no se usa un
+nombre escrito a mano.
+
+### Primer administrador
+
+Hay dos formas (elegí una):
+
+1. **Bootstrap por primer login (recomendado en Render):** configurá `ADMIN_EMAIL`
+   y `ADMIN_PASSWORD` como variables de entorno. Si todavía **no existe ningún
+   usuario**, el primer login con esas credenciales crea el admin automáticamente.
+   Entrá y, desde **Usuarios**, creá el resto de las cuentas. Cambiá tu contraseña
+   en cuanto puedas.
+2. **Seed por comando (local o con shell):** `ADMIN_EMAIL=... ADMIN_PASSWORD=... npm run seed:admin`.
+
+Recuperación de contraseña: el admin la reinicia desde la pantalla **Usuarios**
+(botón "Reiniciar contraseña"); cada usuario también puede cambiar la suya. (Un
+flujo de auto-recuperación por correo requeriría conectar un proveedor de email.)
+
+### Las cotizaciones anteriores siguen funcionando
+
+El login no cambia los datos: las cotizaciones que ya existían quedan visibles y
+editables para los usuarios con el permiso correspondiente. Las entradas de
+historial viejas (sin usuario real) se conservan; de aquí en adelante se registra
+el usuario autenticado.
 
 ---
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { AttachmentDTO } from '@/lib/types';
-import { api, readActor } from '@/lib/client';
+import { api } from '@/lib/client';
 
 export function Attachments({ quoteId, locked }: { quoteId: string; locked: boolean }) {
   const [list, setList] = useState<AttachmentDTO[]>([]);
@@ -23,9 +23,6 @@ export function Attachments({ quoteId, locked }: { quoteId: string; locked: bool
     try {
       const fd = new FormData();
       fd.append('file', file);
-      const actor = readActor();
-      fd.append('_actorName', actor.name);
-      fd.append('_actorRole', actor.role);
       await api(`/api/quotes/${quoteId}/attachments`, { method: 'POST', body: fd });
       await load();
     } catch (e) {

@@ -12,6 +12,7 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
+    "seed:admin": "tsx prisma/seed-admin.ts",
     "db:studio": "prisma studio",
     "test:calc": "tsx src/lib/calc.test.ts"
   },
@@ -21,12 +22,15 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
     "@prisma/client": "^5.22.0",
+    "bcryptjs": "^2.4.3",
+    "jose": "^5.9.6",
     "next": "14.2.15",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",

@@ -3,21 +3,38 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import type { AttachmentDTO, QuoteDTO } from '@/lib/types';
+import type { AttachmentDTO } from '@/lib/types';
 import { api } from '@/lib/client';
-import { computeFromQuote, formatMoney } from '@/lib/calc';
+import { formatMoney } from '@/lib/calc';
 
-// Vista limpia para el cliente. NO muestra costos internos, markup ni ganancia.
+// Payload SEGURO que recibe la vista cliente / PDF. Viene de /api/quotes/:id/client,
+// que calcula en el servidor y NO envía nada interno (markup, costos, %, márgenes, notas,
+// precios unitarios). Acá no se hace ningún cálculo de costos.
+interface ClientPayload {
+  companyName: string;
+  client: string;
+  jobName: string;
+  number: string;
+  date: string;
+  currency: string;
+  ivaPct: number;
+  estimatedDays: number | null;
+  includeAttachmentsInPdf: boolean;
+  partidas: { materiales: string[]; manoObra: string[]; otros: string[] };
+  totals: { subtotal: number; iva: number; total: number };
+}
+
+// Vista limpia para el cliente. NO recibe ni muestra costos internos, markup ni ganancia.
 // "Descargar PDF" e "Imprimir" usan la impresión del navegador (Guardar como PDF).
 export default function ClientView() {
   const { id } = useParams<{ id: string }>();
-  const [quote, setQuote] = useState<QuoteDTO | null>(null);
+  const [data, setData] = useState<ClientPayload | null>(null);
   const [atts, setAtts] = useState<AttachmentDTO[]>([]);
 
   useEffect(() => {
-    api<QuoteDTO>(`/api/quotes/${id}`).then(async (q) => {
-      setQuote(q);
-      if (q.includeAttachmentsInPdf) {
+    api<ClientPayload>(`/api/quotes/${id}/client`).then(async (d) => {
+      setData(d);
+      if (d.includeAttachmentsInPdf) {
         try {
           setAtts(await api<AttachmentDTO[]>(`/api/quotes/${id}/attachments`));
         } catch {
@@ -27,13 +44,9 @@ export default function ClientView() {
     });
   }, [id]);
 
-  if (!quote) return <p className="py-16 text-center text-slate-400">Cargando…</p>;
+  if (!data) return <p className="py-16 text-center text-slate-400">Cargando…</p>;
 
-  const c = computeFromQuote(quote);
-  const cur = quote.currency;
-  const materials = quote.items.filter((i) => i.kind === 'material' && i.description.trim());
-  const labor = quote.items.filter((i) => i.kind === 'labor' && i.description.trim());
-  const others = quote.items.filter((i) => i.kind === 'other' && i.description.trim());
+  const cur = data.currency;
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-6">
@@ -56,51 +69,51 @@ export default function ClientView() {
       <div className="print-area card mx-auto bg-white p-8">
         <div className="flex items-start justify-between border-b border-slate-200 pb-4">
           <div>
-            <h1 className="text-2xl font-bold">{quote.companyName}</h1>
+            <h1 className="text-2xl font-bold">{data.companyName}</h1>
             <p className="text-sm text-slate-500">Cotización</p>
           </div>
           <div className="text-right text-sm">
             <p>
-              <span className="text-slate-400">N.º:</span> {quote.number}
+              <span className="text-slate-400">N.º:</span> {data.number}
             </p>
             <p>
               <span className="text-slate-400">Fecha:</span>{' '}
-              {new Date(quote.date).toLocaleDateString('es-GT')}
+              {new Date(data.date).toLocaleDateString('es-GT')}
             </p>
           </div>
         </div>
 
         <div className="my-4">
           <p className="text-sm text-slate-400">Cliente</p>
-          <p className="text-lg font-semibold">{quote.client}</p>
-          <p className="text-slate-600">{quote.jobName}</p>
-          {quote.estimatedDays != null && (
+          <p className="text-lg font-semibold">{data.client}</p>
+          <p className="text-slate-600">{data.jobName}</p>
+          {data.estimatedDays != null && (
             <p className="mt-1 text-sm text-slate-500">
-              Tiempo estimado de obra: {quote.estimatedDays} días
+              Tiempo estimado de obra: {data.estimatedDays} días
             </p>
           )}
         </div>
 
-        {/* Partidas (descripciones, sin costos internos) */}
+        {/* Partidas (solo descripciones, sin costos internos) */}
         <div className="space-y-3">
-          <PartidaGroup title="Materiales" items={materials.map((i) => i.description)} />
-          <PartidaGroup title="Mano de obra" items={labor.map((i) => i.description)} />
-          <PartidaGroup title="Otros" items={others.map((i) => i.description)} />
+          <PartidaGroup title="Materiales" items={data.partidas.materiales} />
+          <PartidaGroup title="Mano de obra" items={data.partidas.manoObra} />
+          <PartidaGroup title="Otros" items={data.partidas.otros} />
         </div>
 
         {/* Resumen financiero: solo subtotal, IVA y TOTAL */}
         <div className="mt-6 ml-auto max-w-xs space-y-1 text-sm">
           <div className="flex justify-between">
             <span className="text-slate-500">Subtotal</span>
-            <span className="font-medium">{formatMoney(c.precioSinIva, cur)}</span>
+            <span className="font-medium">{formatMoney(data.totals.subtotal, cur)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-slate-500">IVA ({quote.ivaPct}%)</span>
-            <span className="font-medium">{formatMoney(c.iva, cur)}</span>
+            <span className="text-slate-500">IVA ({data.ivaPct}%)</span>
+            <span className="font-medium">{formatMoney(data.totals.iva, cur)}</span>
           </div>
           <div className="flex justify-between border-t border-slate-300 pt-2 text-lg font-bold">
             <span>TOTAL</span>
-            <span>{formatMoney(c.precioFinal, cur)}</span>
+            <span>{formatMoney(data.totals.total, cur)}</span>
           </div>
         </div>
 
@@ -125,7 +138,7 @@ export default function ClientView() {
         )}
 
         <p className="mt-8 text-center text-xs text-slate-400">
-          Gracias por su preferencia · {quote.companyName}
+          Gracias por su preferencia · {data.companyName}
         </p>
       </div>
 
